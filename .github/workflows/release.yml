@@ -24,7 +24,11 @@ jobs:
           if xcodebuild -scheme MenuBarNotes -configuration Release -destination 'platform=macOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO > build.log 2>&1; then
             echo "::notice::build ok: $(ls -l build/Build/Products/Release/MenuBarNotes 2>&1)"
           else
-            tail -n 25 build.log | while IFS= read -r line; do echo "::error::$line"; done
+            if grep -q "error:" build.log; then
+              grep "error:" build.log | head -12 | while IFS= read -r line; do echo "::error::$line"; done
+            else
+              tail -n 15 build.log | while IFS= read -r line; do echo "::error::$line"; done
+            fi
             exit 1
           fi
 
