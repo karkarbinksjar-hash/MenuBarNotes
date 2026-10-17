@@ -53,10 +53,11 @@ See [ROADMAP.md](ROADMAP.md) for shipped and planned features.
 
 ```sh
 swift build -c release            # or: xcodebuild -scheme MenuBarNotes -configuration Release
-./scripts/package-app.sh .build/release/MenuBarNotes
+./scripts/package-app.sh .build/release/MenuBarNotes MenuBarNotes.zip
+./scripts/package-dmg.sh MenuBarNotes.app MenuBarNotes.dmg
 open MenuBarNotes.app
 ```
 
 ## Releases
 
-Push to `main` (or a `v*` tag): GitHub Actions builds `MenuBarNotes.zip` and publishes a GitHub Release with auto-generated release notes.
+Push to `main` (or a `v*` tag): GitHub Actions runs the tests, builds the app, and publishes a GitHub Release with `MenuBarNotes.dmg`, `MenuBarNotes.zip`, and `SHA256SUMS.txt`.

@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -42,12 +44,18 @@ jobs:
           fi
 
       - name: Package
-        run: ./scripts/package-app.sh "build/Build/Products/Release/MenuBarNotes" MenuBarNotes.zip
+        run: |
+          ./scripts/package-app.sh "build/Build/Products/Release/MenuBarNotes" MenuBarNotes.zip
+          ./scripts/package-dmg.sh MenuBarNotes.app MenuBarNotes.dmg
+          shasum -a 256 MenuBarNotes.zip MenuBarNotes.dmg > SHA256SUMS.txt
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v0.1.{0}', github.run_number) }}
-          files: MenuBarNotes.zip
+          files: |
+            MenuBarNotes.zip
+            MenuBarNotes.dmg
+            SHA256SUMS.txt
           generate_release_notes: true
