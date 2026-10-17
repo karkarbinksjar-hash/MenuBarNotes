@@ -43,12 +43,17 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <string>15.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>LSMultipleInstancesProhibited</key>
+    <true/>
+    <key>LSFileQuarantineEnabled</key>
+    <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>
 </plist>
 PLIST
 
-codesign --force -s - "$APP"
+# Ad-hoc sign with the hardened runtime so the app opts into macOS memory protections.
+codesign --force --options runtime -s - "$APP"
 zip -qry "$OUT" "$APP"
 echo "Built $OUT"

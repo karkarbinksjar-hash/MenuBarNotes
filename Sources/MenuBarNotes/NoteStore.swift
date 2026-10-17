@@ -32,7 +32,12 @@ final class NoteStore: NSObject, ObservableObject {
             .appendingPathComponent("MenuBarNotes")
         super.init()
         pinnedFileName = UserDefaults.standard.string(forKey: Self.pinnedDefaultsKey)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // 0o700: other local accounts cannot browse a synced folder full of notes.
+        try? FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
         NSFileCoordinator.addFilePresenter(self)
         refreshList()
     }
@@ -122,6 +127,14 @@ final class NoteStore: NSObject, ObservableObject {
     // MARK: Disk
 
     private func read(_ url: URL) -> String? {
+        guard FileSafety.isSafeNote(url, in: directory) else {
+            fail("Refused to read \(url.lastPathComponent): it is not a regular note in the notes folder.")
+            return nil
+        }
+        guard !FileSafety.isOversized(url) else {
+            fail("\(url.lastPathComponent) is larger than \(FileSafety.maxNoteBytes / 1_048_576) MB and was not opened.")
+            return nil
+        }
         var result: String?
         var coordinationError: NSError?
         NSFileCoordinator(filePresenter: self).coordinate(readingItemAt: url, options: [], error: &coordinationError) { url in
@@ -136,6 +149,14 @@ final class NoteStore: NSObject, ObservableObject {
 
     @discardableResult
     private func write(_ url: URL, _ data: Data) -> Bool {
+        guard FileSafety.isSafeDestination(url, in: directory) else {
+            fail("Refused to write \(url.lastPathComponent): it is not a regular note in the notes folder.")
+            return false
+        }
+        guard !FileSafety.isOversized(url) else {
+            fail("Refused to overwrite \(url.lastPathComponent): the on-disk file is unexpectedly large.")
+            return false
+        }
         var succeeded = false
         var coordinationError: NSError?
         NSFileCoordinator(filePresenter: self).coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { url in
@@ -158,8 +179,12 @@ final class NoteStore: NSObject, ObservableObject {
     }
 
     private func refreshList() {
-        let urls = ((try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [])
-            .filter { $0.pathExtension.lowercased() == "md" }
+        let urls = ((try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]
+        )) ?? [])
+            .filter { $0.pathExtension.lowercased() == "md" && !$0.lastPathComponent.hasPrefix(".") }
+            .filter { FileSafety.isSafeNote($0, in: directory) }
         notes = NoteOrdering.arrange(urls.map { Note(url: $0) }, pinnedFileName: pinnedFileName)
         if let current = currentNote, let match = notes.first(where: { $0.url == current.url }) {
             currentNote = match

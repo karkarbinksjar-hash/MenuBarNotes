@@ -26,6 +26,13 @@ A lightweight macOS 15+ menu bar note-taking app. Notes are plain-text `.md` fil
 | `⌥⌘N` | Quick capture: open the popover with a new note |
 | `⌘Q` | Quit (from the menu bar menu) |
 
+## Security & privacy
+
+- Only touches `~/Documents/MenuBarNotes`; symlinks, non-regular files, and files over 2 MB are refused
+- Atomic, file-coordinated writes; deletes go to the macOS Trash
+- No network calls, no analytics, no accounts — see [SECURITY.md](SECURITY.md)
+- Preview links are limited to `http`, `https`, and `mailto`
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md) for shipped and planned features.

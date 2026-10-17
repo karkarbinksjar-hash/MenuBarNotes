@@ -93,6 +93,36 @@ func parseMarkdown(_ source: String) -> [MarkdownBlock] {
     return blocks
 }
 
+// MARK: - Inline sanitising (links in notes must not launch arbitrary schemes)
+
+enum InlineMarkdown {
+    /// Only web and mail links stay tappable; `file:`, `javascript:`, app schemes
+    /// and anything else are stripped to plain text.
+    static let allowedSchemes: Set<String> = ["http", "https", "mailto"]
+
+    static func isAllowed(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased() else { return false }
+        return allowedSchemes.contains(scheme)
+    }
+
+    static func attributed(_ text: String) -> AttributedString {
+        guard var attributed = try? AttributedString(
+            markdown: text,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        ) else {
+            return AttributedString(text)
+        }
+        let blocked = attributed.runs.compactMap { run -> Range<AttributedString.Index>? in
+            guard let url = run.link, !isAllowed(url) else { return nil }
+            return run.range
+        }
+        for range in blocked {
+            attributed[range].link = nil
+        }
+        return attributed
+    }
+}
+
 // MARK: - SwiftUI rendering with live inline formatting
 
 import SwiftUI
@@ -154,9 +184,6 @@ struct MarkdownPreviewView: View {
     }
 
     private func inline(_ text: String) -> AttributedString {
-        (try? AttributedString(
-            markdown: text,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(text)
+        InlineMarkdown.attributed(text)
     }
 }
