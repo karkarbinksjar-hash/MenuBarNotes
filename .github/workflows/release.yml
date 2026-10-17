@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'arena/**']
     tags: ['v*']
   workflow_dispatch:
 
