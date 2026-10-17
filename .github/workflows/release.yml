@@ -15,6 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test
+        run: |
+          if swift test > test.log 2>&1; then
+            echo "::notice::tests ok"
+          else
+            grep -E "error:|XCTAssert|failed" test.log | head -12 | while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          fi
+
       # Annotations are the only channel visible via gh run view here; keep the build error tail in them.
       - name: Build (Release)
         run: |
