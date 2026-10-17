@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let store = NoteStore()
     private let popover = NSPopover()
     private var statusItem: NSStatusItem?
@@ -12,7 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 940, height: 560)
-        popover.contentViewController = NSHostingController(rootView: ContentView(store: store))
+        popover.delegate = self
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = BrandMark.statusItemImage(size: 18)
@@ -38,9 +38,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// The SwiftUI hierarchy is created on first open and released on close, so a
+    /// hidden popover does no layout, animation, or redraw work.
+    private func makeContentViewIfNeeded() {
+        guard popover.contentViewController == nil else { return }
+        popover.contentViewController = NSHostingController(rootView: ContentView(store: store))
+    }
+
     private func showPopover() {
         guard let button = statusItem?.button else { return }
         guard !popover.isShown else { return }
+        makeContentViewIfNeeded()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
         NSApp.activate()
@@ -58,6 +66,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func quickCapture() {
         showPopover()
         store.newNote()
+    }
+
+    // MARK: - NSPopoverDelegate
+
+    func popoverDidClose(_ notification: Notification) {
+        store.flushSave()
+        popover.contentViewController = nil
     }
 
     private func showMenu() {

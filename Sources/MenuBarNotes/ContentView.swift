@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var store: NoteStore
     @State private var searchText = ""
+    @State private var previewSource = ""
 
     var body: some View {
         HStack(spacing: 0) {
@@ -18,8 +19,24 @@ struct ContentView: View {
                     .onChange(of: store.text) { store.scheduleSave() }
             }
             Divider()
-            MarkdownPreviewView(source: store.text)
+            MarkdownPreviewView(source: previewSource)
                 .frame(minWidth: 320)
+                // Re-parse the document only after a short typing pause instead of
+                // rebuilding the whole preview on every keystroke.
+                .task(id: store.text) {
+                    if previewSource.isEmpty, !store.text.isEmpty {
+                        previewSource = store.text
+                        return
+                    }
+                    do {
+                        try await Task.sleep(for: .milliseconds(180))
+                    } catch {
+                        return
+                    }
+                    if previewSource != store.text {
+                        previewSource = store.text
+                    }
+                }
         }
         .frame(width: 940, height: 560)
         .alert(

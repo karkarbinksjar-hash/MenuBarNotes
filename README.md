@@ -26,6 +26,18 @@ A lightweight macOS 15+ menu bar note-taking app. Notes are plain-text `.md` fil
 | `⌥⌘N` | Quick capture: open the popover with a new note |
 | `⌘Q` | Quit (from the menu bar menu) |
 
+## Performance & battery
+
+- The SwiftUI popover is built when you open it and released when it closes; a
+  hidden MenuBarNotes does no layout, animation, or redraw work
+- Markdown re-parses after a 180 ms typing pause instead of on every keystroke
+- Saves are debounced (400 ms) and skipped when the text is unchanged; closing the
+  popover flushes immediately
+- Cloud-sync notifications are coalesced so a burst of file changes triggers one
+  folder scan
+- No polling timers, background refresh, or network activity — the app uses 0% CPU
+  when the window is closed
+
 ## Security & privacy
 
 - Only touches `~/Documents/MenuBarNotes`; symlinks, non-regular files, and files over 2 MB are refused

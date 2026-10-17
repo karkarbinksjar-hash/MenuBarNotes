@@ -12,6 +12,7 @@ final class NoteStore: NSObject, ObservableObject {
 
     let directory: URL
     private var pendingSave: DispatchWorkItem?
+    private var pendingRefresh: DispatchWorkItem?
     // Presenter callbacks use their own serial queue so NSFileCoordinator never re-enters this presenter while a callback is in flight (deadlock).
     private let presenterQueue: OperationQueue = {
         let queue = OperationQueue()
@@ -111,6 +112,19 @@ final class NoteStore: NSObject, ObservableObject {
         }
     }
 
+    /// Cloud clients fire a burst of presenter callbacks per file save. Coalesce
+    /// them into a single directory scan instead of enumerating on every event.
+    private func scheduleRefresh() {
+        pendingRefresh?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingRefresh = nil
+            self.refreshList()
+        }
+        pendingRefresh = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+
     // MARK: Pinning
 
     func isPinned(_ note: Note) -> Bool {
@@ -179,6 +193,8 @@ final class NoteStore: NSObject, ObservableObject {
     }
 
     private func refreshList() {
+        pendingRefresh?.cancel()
+        pendingRefresh = nil
         let urls = ((try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]
@@ -209,7 +225,7 @@ extension NoteStore: NSFilePresenter {
             if url == self.currentNote?.url, let content = self.read(url), content != self.text {
                 self.text = content // external edit wins; our pending save is a no-op afterwards
             }
-            self.refreshList()
+            self.scheduleRefresh()
         }
     }
 }
