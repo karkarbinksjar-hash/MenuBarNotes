@@ -15,13 +15,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Annotations are the only channel visible via gh run view here; keep the build error tail in them.
       - name: Build (Release)
-        run: xcodebuild -scheme MenuBarNotes -configuration Release -destination 'platform=macOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+        run: |
+          set -o pipefail
+          echo "::notice::$(xcodebuild -version | tr '\n' ' ')"
+          echo "::notice::schemes: $(xcodebuild -list 2>&1 | tr '\n' ' ')"
+          if xcodebuild -scheme MenuBarNotes -configuration Release -destination 'platform=macOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO > build.log 2>&1; then
+            echo "::notice::build ok: $(ls -l build/Build/Products/Release/MenuBarNotes 2>&1)"
+          else
+            tail -n 25 build.log | while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          fi
 
       - name: Package
         run: ./scripts/package-app.sh "build/Build/Products/Release/MenuBarNotes" MenuBarNotes.zip
 
       - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v0.1.{0}', github.run_number) }}
