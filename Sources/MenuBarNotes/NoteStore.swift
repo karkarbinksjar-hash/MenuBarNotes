@@ -9,6 +9,12 @@ final class NoteStore: NSObject, ObservableObject {
     @Published var saveError: String?
     @Published private(set) var pinnedFileName: String?
     @Published private(set) var lastSavedAt: Date?
+    @Published private(set) var isSaving = false
+    private var persistedText: String?
+    var persistedTextForStatus: String? { persistedText }
+    var saveStatus: NoteSaveStatus {
+        NoteSaveStatus.compute(isSaving: isSaving, currentText: text, persistedText: persistedText)
+    }
 
     let directory: URL
     private var pendingSave: DispatchWorkItem?
@@ -50,6 +56,7 @@ final class NoteStore: NSObject, ObservableObject {
         flushSave()
         currentNote = note
         text = read(note.url) ?? ""
+        persistedText = text
         lastSavedAt = nil
     }
 
@@ -70,6 +77,7 @@ final class NoteStore: NSObject, ObservableObject {
         if let note = notes.first(where: { $0.url == url }) {
             currentNote = note
             text = ""
+            persistedText = ""
             lastSavedAt = Date()
         }
     }
@@ -105,10 +113,15 @@ final class NoteStore: NSObject, ObservableObject {
         pendingSave?.cancel()
         pendingSave = nil
         guard let note = currentNote else { return }
-        // Skip no-op writes so our own saves don't bounce back through the file presenter.
-        guard read(note.url) != text else { return }
+        // Compare against the last content we successfully loaded or wrote. A failed/missing
+        // disk read must never be interpreted as proof that the in-memory edit is saved.
+        guard persistedText != text else { return }
+        isSaving = true
+        defer { isSaving = false }
         if write(note.url, Data(text.utf8)) {
+            persistedText = text
             lastSavedAt = Date()
+            saveError = nil
         }
     }
 
@@ -189,7 +202,7 @@ final class NoteStore: NSObject, ObservableObject {
 
     private func fail(_ message: String) {
         NSLog("MenuBarNotes: %@", message)
-        saveError = message
+        if saveError == nil { saveError = message }
     }
 
     private func refreshList() {
@@ -207,6 +220,7 @@ final class NoteStore: NSObject, ObservableObject {
         } else {
             currentNote = notes.first
             text = currentNote.flatMap { read($0.url) } ?? ""
+            persistedText = text
             lastSavedAt = nil
         }
     }
@@ -223,9 +237,23 @@ extension NoteStore: NSFilePresenter {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             if url == self.currentNote?.url, let content = self.read(url), content != self.text {
-                self.text = content // external edit wins; our pending save is a no-op afterwards
+                self.text = content // external edit wins
+                self.persistedText = content
             }
             self.scheduleRefresh()
         }
+    }
+}
+
+/// Pure save-state logic shared by the UI and regression tests.
+enum NoteSaveStatus: Equatable {
+    case saving
+    case unsaved
+    case saved
+
+    static func compute(isSaving: Bool, currentText: String, persistedText: String?) -> NoteSaveStatus {
+        if isSaving { return .saving }
+        guard let persistedText, persistedText == currentText else { return .unsaved }
+        return .saved
     }
 }

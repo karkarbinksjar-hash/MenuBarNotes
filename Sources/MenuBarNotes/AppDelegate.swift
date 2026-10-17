@@ -70,6 +70,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     // MARK: - NSPopoverDelegate
 
+    func applicationWillTerminate(_ notification: Notification) {
+        store.flushSave()
+    }
+
     func popoverDidClose(_ notification: Notification) {
         store.flushSave()
         popover.contentViewController = nil
@@ -78,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func showMenu() {
         guard let button = statusItem?.button else { return }
         let menu = NSMenu()
+        menu.addItem(menuItem("Save (⌘S)", #selector(saveFromMenu)))
         menu.addItem(menuItem("New Note (⌥⌘N)", #selector(newNoteFromMenu)))
         menu.addItem(menuItem("Open Notes Folder", #selector(openNotesFolder)))
         menu.addItem(.separator())
@@ -91,6 +96,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
         return item
+    }
+
+    @objc private func saveFromMenu() {
+        store.flushSave()
     }
 
     @objc private func newNoteFromMenu() {
