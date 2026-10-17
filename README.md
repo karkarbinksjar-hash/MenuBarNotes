@@ -1,4 +1,10 @@
-# MenuBarNotes
+<p align="center">
+  <img src="assets/logo-256.png" width="128" height="128" alt="MenuBarNotes app icon">
+</p>
+
+<h1 align="center">MenuBarNotes</h1>
+
+<p align="center">A tiny menu bar markdown notebook — plain files, no lock-in.</p>
 
 A lightweight macOS 15+ menu bar note-taking app. Notes are plain-text `.md` files in `~/Documents/MenuBarNotes` — no database, no lock-in.
 

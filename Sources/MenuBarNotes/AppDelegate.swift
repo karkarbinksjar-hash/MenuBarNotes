@@ -14,7 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController = NSHostingController(rootView: ContentView(store: store))
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "MenuBarNotes")
+        item.button?.image = BrandMark.statusItemImage(size: 18)
+        item.button?.imagePosition = .imageOnly
         item.button?.target = self
         item.button?.action = #selector(statusItemClicked)
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -47,7 +48,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showMenu() {
         guard let button = statusItem?.button else { return }
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Quit MenuBarNotes", action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "About MenuBarNotes", action: #selector(showAbout), keyEquivalent: ""))
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "Quit MenuBarNotes", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 2), in: button)
+    }
+
+    @objc private func showAbout() {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "MenuBarNotes",
+            .applicationVersion: version,
+            .version: "",
+            .applicationIcon: BrandMark.appIconImage(size: 256),
+            .credits: NSAttributedString(string: "Menu bar markdown notes, stored as plain files you own."),
+        ])
+        NSApp.activate()
     }
 }
