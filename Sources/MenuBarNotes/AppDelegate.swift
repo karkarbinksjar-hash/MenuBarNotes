@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let popover = NSPopover()
     private var statusItem: NSStatusItem?
     private var hotKey: HotKey?
+    private var quickCaptureHotKey: HotKey?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         popover.behavior = .transient
@@ -24,6 +25,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKey = HotKey(keyCode: UInt32(kVK_ANSI_N), modifiers: UInt32(cmdKey | shiftKey)) { [weak self] in
             self?.togglePopover()
         }
+        quickCaptureHotKey = HotKey(keyCode: UInt32(kVK_ANSI_N), modifiers: UInt32(optionKey | cmdKey)) { [weak self] in
+            self?.quickCapture()
+        }
     }
 
     @objc private func statusItemClicked() {
@@ -34,24 +38,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func togglePopover() {
+    private func showPopover() {
         guard let button = statusItem?.button else { return }
+        guard !popover.isShown else { return }
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
+        NSApp.activate()
+    }
+
+    private func togglePopover() {
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
-            NSApp.activate()
+            showPopover()
         }
+    }
+
+    /// ⌥⌘N: open the popover and start a fresh note from anywhere.
+    private func quickCapture() {
+        showPopover()
+        store.newNote()
     }
 
     private func showMenu() {
         guard let button = statusItem?.button else { return }
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "About MenuBarNotes", action: #selector(showAbout), keyEquivalent: ""))
+        menu.addItem(menuItem("New Note (⌥⌘N)", #selector(newNoteFromMenu)))
+        menu.addItem(menuItem("Open Notes Folder", #selector(openNotesFolder)))
+        menu.addItem(.separator())
+        menu.addItem(menuItem("About MenuBarNotes", #selector(showAbout)))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit MenuBarNotes", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 2), in: button)
+    }
+
+    private func menuItem(_ title: String, _ action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
+    @objc private func newNoteFromMenu() {
+        showPopover()
+        store.newNote()
+    }
+
+    @objc private func openNotesFolder() {
+        NSWorkspace.shared.open(store.directory)
     }
 
     @objc private func showAbout() {

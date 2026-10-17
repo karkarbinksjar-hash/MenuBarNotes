@@ -1,11 +1,5 @@
 import Foundation
 
-struct Note: Identifiable, Equatable, Hashable {
-    let url: URL
-    var id: URL { url }
-    var name: String { url.deletingPathExtension().lastPathComponent }
-}
-
 /// Plain `.md` files in ~/Documents/MenuBarNotes. Writes are atomic and
 /// coordinated so cloud-sync daemons never see partial or conflicting files.
 final class NoteStore: NSObject, ObservableObject {
@@ -13,6 +7,8 @@ final class NoteStore: NSObject, ObservableObject {
     @Published var currentNote: Note?
     @Published var text: String = ""
     @Published var saveError: String?
+    @Published private(set) var pinnedFileName: String?
+    @Published private(set) var lastSavedAt: Date?
 
     let directory: URL
     private var pendingSave: DispatchWorkItem?
@@ -24,10 +20,18 @@ final class NoteStore: NSObject, ObservableObject {
         return queue
     }()
 
+    private static let pinnedDefaultsKey = "pinnedNoteFileName"
+    private static let nameFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        return formatter
+    }()
+
     override init() {
         directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("MenuBarNotes")
         super.init()
+        pinnedFileName = UserDefaults.standard.string(forKey: Self.pinnedDefaultsKey)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         NSFileCoordinator.addFilePresenter(self)
         refreshList()
@@ -40,32 +44,47 @@ final class NoteStore: NSObject, ObservableObject {
         flushSave()
         currentNote = note
         text = read(note.url) ?? ""
+        lastSavedAt = nil
     }
 
     func newNote() {
         flushSave()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let url = directory.appendingPathComponent("Note \(formatter.string(from: Date())).md")
-        write(url, Data())
+        let base = "Note \(Self.nameFormatter.string(from: Date()))"
+        let existing = Set(notes.map { $0.fileName.lowercased() })
+        var fileName = "\(base).md"
+        var counter = 2
+        while existing.contains(fileName.lowercased()) {
+            fileName = "\(base) \(counter).md"
+            counter += 1
+        }
+
+        let url = directory.appendingPathComponent(fileName)
+        guard write(url, Data()) else { return }
         refreshList()
         if let note = notes.first(where: { $0.url == url }) {
             currentNote = note
             text = ""
+            lastSavedAt = Date()
         }
     }
 
     func delete(_ note: Note) {
         flushSave()
-        var error: NSError?
-        NSFileCoordinator(filePresenter: self).coordinate(writingItemAt: note.url, options: .forDeleting, error: &error) { url in
+        var coordinationError: NSError?
+        NSFileCoordinator(filePresenter: self).coordinate(writingItemAt: note.url, options: .forDeleting, error: &coordinationError) { url in
             do {
-                try FileManager.default.removeItem(at: url)
+                try FileManager.default.trashItem(at: url, resultingItemURL: nil)
             } catch {
-                self.fail("Couldn't delete \(note.name): \(error.localizedDescription)")
+                self.fail("Couldn't move \(note.name) to Trash: \(error.localizedDescription)")
             }
         }
-        if let error { fail("Couldn't delete \(note.name): \(error.localizedDescription)") }
+        if let coordinationError {
+            fail("Couldn't move \(note.name) to Trash: \(coordinationError.localizedDescription)")
+        }
+        if currentNote?.url == note.url {
+            currentNote = nil
+            text = ""
+        }
         refreshList()
     }
 
@@ -82,15 +101,30 @@ final class NoteStore: NSObject, ObservableObject {
         guard let note = currentNote else { return }
         // Skip no-op writes so our own saves don't bounce back through the file presenter.
         guard read(note.url) != text else { return }
-        write(note.url, Data(text.utf8))
+        if write(note.url, Data(text.utf8)) {
+            lastSavedAt = Date()
+        }
+    }
+
+    // MARK: Pinning
+
+    func isPinned(_ note: Note) -> Bool {
+        note.fileName == pinnedFileName
+    }
+
+    func togglePin(_ note: Note) {
+        let newValue = isPinned(note) ? nil : note.fileName
+        pinnedFileName = newValue
+        UserDefaults.standard.set(newValue, forKey: Self.pinnedDefaultsKey)
+        notes = NoteOrdering.arrange(notes, pinnedFileName: newValue)
     }
 
     // MARK: Disk
 
     private func read(_ url: URL) -> String? {
         var result: String?
-        var error: NSError?
-        NSFileCoordinator(filePresenter: self).coordinate(readingItemAt: url, options: [], error: &error) { url in
+        var coordinationError: NSError?
+        NSFileCoordinator(filePresenter: self).coordinate(readingItemAt: url, options: [], error: &coordinationError) { url in
             do {
                 result = try String(contentsOf: url, encoding: .utf8)
             } catch {
@@ -100,15 +134,22 @@ final class NoteStore: NSObject, ObservableObject {
         return result
     }
 
-    private func write(_ url: URL, _ data: Data) {
-        var error: NSError?
-        NSFileCoordinator(filePresenter: self).coordinate(writingItemAt: url, options: .forReplacing, error: &error) { url in
+    @discardableResult
+    private func write(_ url: URL, _ data: Data) -> Bool {
+        var succeeded = false
+        var coordinationError: NSError?
+        NSFileCoordinator(filePresenter: self).coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { url in
             do {
                 try data.write(to: url, options: .atomic)
+                succeeded = true
             } catch {
                 self.fail("Couldn't save \(url.lastPathComponent): \(error.localizedDescription)")
             }
         }
+        if let coordinationError {
+            fail("Couldn't save \(url.lastPathComponent): \(coordinationError.localizedDescription)")
+        }
+        return succeeded
     }
 
     private func fail(_ message: String) {
@@ -119,13 +160,13 @@ final class NoteStore: NSObject, ObservableObject {
     private func refreshList() {
         let urls = ((try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [])
             .filter { $0.pathExtension.lowercased() == "md" }
-            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-        notes = urls.map { Note(url: $0) }
+        notes = NoteOrdering.arrange(urls.map { Note(url: $0) }, pinnedFileName: pinnedFileName)
         if let current = currentNote, let match = notes.first(where: { $0.url == current.url }) {
             currentNote = match
         } else {
             currentNote = notes.first
             text = currentNote.flatMap { read($0.url) } ?? ""
+            lastSavedAt = nil
         }
     }
 }

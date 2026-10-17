@@ -12,8 +12,23 @@ A lightweight macOS 15+ menu bar note-taking app. Notes are plain-text `.md` fil
 
 - Menu bar only (`LSUIElement`) — no Dock icon
 - Markdown editor with real-time preview (headings, lists, code blocks, task checkboxes)
-- Global hotkey `Cmd+Shift+N` to show/hide the popover
+- Global hotkeys: `⌘⇧N` shows/hides the popover, `⌥⌘N` quick-captures a new note
+- Instant search, pin-to-top, and move-to-Trash in the sidebar
+- Word count and last-saved time while you type
 - Sync-safe storage: atomic writes + `NSFileCoordinator`/`NSFilePresenter`, so iCloud Drive, Dropbox, OneDrive and Google Drive can sync the folder without corrupting notes — external changes reload live
+- Plain `.md` files in `~/Documents/MenuBarNotes` (right-click the menu bar icon → Open Notes Folder)
+
+## Hotkeys
+
+| Shortcut | Action |
+| --- | --- |
+| `⌘⇧N` | Show or hide the notes popover |
+| `⌥⌘N` | Quick capture: open the popover with a new note |
+| `⌘Q` | Quit (from the menu bar menu) |
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for shipped and planned features.
 
 ## Build
 
