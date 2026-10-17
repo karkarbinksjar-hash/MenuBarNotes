@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (Release)
+        run: xcodebuild -scheme MenuBarNotes -configuration Release -destination 'platform=macOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+
+      - name: Package
+        run: ./scripts/package-app.sh "build/Build/Products/Release/MenuBarNotes" MenuBarNotes.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v0.1.{0}', github.run_number) }}
+          files: MenuBarNotes.zip
+          generate_release_notes: true
