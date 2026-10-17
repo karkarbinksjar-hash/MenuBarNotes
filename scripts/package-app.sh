@@ -5,11 +5,18 @@ set -euo pipefail
 BIN="${1:?usage: package-app.sh <path-to-binary> [out.zip]}"
 OUT="${2:-MenuBarNotes.zip}"
 APP="MenuBarNotes.app"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ICON="$ROOT/assets/AppIcon.icns"
 
 rm -rf "$APP" "$OUT"
 mkdir -p "$APP/Contents/MacOS"
 cp "$BIN" "$APP/Contents/MacOS/MenuBarNotes"
 chmod +x "$APP/Contents/MacOS/MenuBarNotes"
+
+if [[ -f "$ICON" ]]; then
+    mkdir -p "$APP/Contents/Resources"
+    cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
+fi
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -22,6 +29,10 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <string>com.karkarbinksjar.MenuBarNotes</string>
     <key>CFBundleName</key>
     <string>MenuBarNotes</string>
+    <key>CFBundleDisplayName</key>
+    <string>MenuBarNotes</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -32,12 +43,17 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <string>15.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>LSMultipleInstancesProhibited</key>
+    <true/>
+    <key>LSFileQuarantineEnabled</key>
+    <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>
 </plist>
 PLIST
 
-codesign --force -s - "$APP"
+# Ad-hoc sign with the hardened runtime so the app opts into macOS memory protections.
+codesign --force --options runtime -s - "$APP"
 zip -qry "$OUT" "$APP"
 echo "Built $OUT"

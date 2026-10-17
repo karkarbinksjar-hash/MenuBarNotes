@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="MenuBarNotes logo">
+  <title>MenuBarNotes</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6C7CFF"/>
+      <stop offset="1" stop-color="#8B4DF0"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EEF1FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- app tile -->
+  <rect x="28" y="28" width="968" height="968" rx="226" fill="url(#bg)"/>
+  <path fill="#FFFFFF" opacity="0.10" d="M28 250 C28 128 128 28 250 28 H 520 L 28 520 Z"/>
+  <rect x="28" y="28" width="968" height="968" rx="226" fill="none" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="4"/>
+
+  <!-- note page with folded corner -->
+  <path fill="url(#page)" d="M330 176 H 620 L 790 346 V 782 Q 790 848 724 848 H 330 Q 264 848 264 782 V 242 Q 264 176 330 176 Z"/>
+  <path fill="#D3DCFF" d="M620 176 V 300 Q 620 346 666 346 H 790 Z"/>
+
+  <!-- markdown # -->
+  <g stroke="#4F46E5" stroke-width="32" stroke-linecap="round" fill="none">
+    <path d="M406 394 L 370 524"/>
+    <path d="M506 394 L 470 524"/>
+    <path d="M354 438 H 528"/>
+    <path d="M344 490 H 518"/>
+  </g>
+
+  <!-- heading + body lines -->
+  <rect x="592" y="414" width="148" height="40" rx="20" fill="#242A4A"/>
+  <g fill="#C3CCE6">
+    <rect x="342" y="600" width="386" height="34" rx="17"/>
+    <rect x="342" y="664" width="330" height="34" rx="17"/>
+    <rect x="342" y="728" width="356" height="34" rx="17"/>
+  </g>
+
+  <!-- done badge -->
+  <circle cx="726" cy="746" r="104" fill="#FFFFFF"/>
+  <circle cx="726" cy="746" r="84" fill="#22C55E"/>
+  <path d="M684 748 L 714 778 L 770 716" fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
