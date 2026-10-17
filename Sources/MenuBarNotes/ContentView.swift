@@ -119,6 +119,10 @@ struct ContentView: View {
                     .monospacedDigit()
                 saveStatus
             }
+            Button("Save") { store.flushSave() }
+                .keyboardShortcut("s", modifiers: .command)
+                .help("Save note (⌘S)")
+
             Button {
                 if let note = store.currentNote { store.togglePin(note) }
             } label: {
@@ -146,14 +150,16 @@ struct ContentView: View {
 
     @ViewBuilder
     private var saveStatus: some View {
-        if let savedAt = store.lastSavedAt {
-            Text("Saved \(savedAt, style: .time)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        if store.saveStatus == .saving {
+            Text("Saving…").font(.caption).foregroundStyle(.secondary)
+        } else if store.saveStatus == .unsaved {
+            Text("Unsaved changes").font(.caption).foregroundStyle(.orange)
+        } else if let savedAt = store.lastSavedAt {
+            Text("All changes saved · \(savedAt, style: .time)")
+                .font(.caption).foregroundStyle(.secondary)
         } else {
-            Text("Not saved yet")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text("All changes saved")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }
