@@ -8,14 +8,8 @@ let package = Package(
         .executable(name: "MenuBarNotes", targets: ["MenuBarNotes"]),
     ],
     targets: [
-        .executableTarget(
-            name: "MenuBarNotes",
-            swiftLanguageMode: .v5
-        ),
-        .testTarget(
-            name: "MenuBarNotesTests",
-            dependencies: ["MenuBarNotes"],
-            swiftLanguageMode: .v5
-        ),
-    ]
+        .executableTarget(name: "MenuBarNotes"),
+        .testTarget(name: "MenuBarNotesTests", dependencies: ["MenuBarNotes"]),
+    ],
+    swiftLanguageModes: [.v5]
 )

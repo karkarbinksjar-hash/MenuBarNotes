@@ -15,10 +15,6 @@ func parseMarkdown(_ source: String) -> [MarkdownBlock] {
     var blocks: [MarkdownBlock] = []
     var paragraph: [String] = []
     var codeLines: [String]?
-    let heading = /^(#{1,6})\s+(.*)$/
-    let task = /^\s*[-*]\s+\[([ xX])\]\s*(.*)$/
-    let bullet = /^\s*[-*]\s+(.*)$/
-    let numbered = /^\s*\d+[.)]\s+(.*)$/
 
     func flushParagraph() {
         if !paragraph.isEmpty {
@@ -36,25 +32,58 @@ func parseMarkdown(_ source: String) -> [MarkdownBlock] {
                 code.append(line)
                 codeLines = code
             }
-        } else if line.hasPrefix("```") {
+            continue
+        }
+        if line.hasPrefix("```") {
             flushParagraph()
             codeLines = []
-        } else if let match = line.wholeMatch(of: heading) {
+            continue
+        }
+
+        let text = line.drop { $0 == " " || $0 == "\t" }
+
+        if text.hasPrefix("#") {
+            let level = text.prefix { $0 == "#" }.count
+            let rest = text.dropFirst(level)
+            if level <= 6, rest.hasPrefix(" ") {
+                flushParagraph()
+                blocks.append(.heading(level: level, text: String(rest.dropFirst(1))))
+                continue
+            }
+        }
+
+        if text.hasPrefix("- ") || text.hasPrefix("* ") {
+            let rest = text.dropFirst(2)
             flushParagraph()
-            blocks.append(.heading(level: match.output.1.count, text: String(match.output.2)))
-        } else if let match = line.wholeMatch(of: task) {
-            flushParagraph()
-            blocks.append(.task(done: match.output.1 != " ", text: String(match.output.2)))
-        } else if let match = line.wholeMatch(of: bullet) {
-            flushParagraph()
-            blocks.append(.bullet(String(match.output.1)))
-        } else if let match = line.wholeMatch(of: numbered) {
-            flushParagraph()
-            blocks.append(.numbered(String(match.output.1)))
-        } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
+            if rest.hasPrefix("["), rest.count >= 3 {
+                let mark = rest[rest.index(after: rest.startIndex)]
+                if rest[rest.index(rest.startIndex, offsetBy: 2)] == "]", mark == " " || mark == "x" || mark == "X" {
+                    let body = rest.dropFirst(3).drop { $0 == " " }
+                    blocks.append(.task(done: mark != " ", text: String(body)))
+                    continue
+                }
+            }
+            blocks.append(.bullet(String(rest)))
+            continue
+        }
+
+        if let first = text.first, first.isNumber {
+            var digits = text.startIndex
+            while digits < text.endIndex, text[digits].isNumber { digits = text.index(after: digits) }
+            if digits < text.endIndex, text[digits] == "." || text[digits] == ")" {
+                let after = text.index(after: digits)
+                if after < text.endIndex, text[after] == " " {
+                    flushParagraph()
+                    blocks.append(.numbered(String(text[text.index(after: after)...])))
+                    continue
+                }
+            }
+        }
+
+        if text.isEmpty {
             flushParagraph()
         } else {
-            paragraph.append(line)
+            paragraph.append(String(text))
         }
     }
     flushParagraph()
@@ -73,9 +102,10 @@ struct MarkdownPreviewView: View {
 
     var body: some View {
         ScrollView {
+            let blocks = parseMarkdown(source)
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(parseMarkdown(source).enumerated()), id: \.offset) { _, block in
-                    blockView(block)
+                ForEach(blocks.indices, id: \.self) { index in
+                    blockView(blocks[index])
                 }
             }
             .padding(12)

@@ -120,7 +120,7 @@ final class NoteStore: NSObject, ObservableObject {
         let urls = ((try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [])
             .filter { $0.pathExtension.lowercased() == "md" }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-        notes = urls.map(Note.init(url:))
+        notes = urls.map { Note(url: $0) }
         if let current = currentNote, let match = notes.first(where: { $0.url == current.url }) {
             currentNote = match
         } else {
@@ -136,11 +136,11 @@ extension NoteStore: NSFilePresenter {
     var presentedItemURL: URL? { directory }
     var presentedItemOperationQueue: OperationQueue { presenterQueue }
 
-    func presentedSubitemDidChange(at url: URL?) {
+    func presentedSubitemDidChange(at url: URL) {
         // Hop to main before coordinating so we never call NSFileCoordinator from the presenter queue.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            if let url, url == self.currentNote?.url, let content = self.read(url), content != self.text {
+            if url == self.currentNote?.url, let content = self.read(url), content != self.text {
                 self.text = content // external edit wins; our pending save is a no-op afterwards
             }
             self.refreshList()
